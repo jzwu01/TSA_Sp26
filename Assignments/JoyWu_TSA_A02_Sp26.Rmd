@@ -1,0 +1,170 @@
+---
+title: "ENV 790.30 - Time Series Analysis for Energy Data | Spring 2026"
+subtitle: "Assignment 2 - Due date 01/27/26"
+author: "Joy Wu"
+output: pdf_document
+geometry: margin=2.54cm
+editor_options: 
+  chunk_output_type: console
+---
+
+## Submission Instructions
+
+You should open the .rmd file corresponding to this assignment on RStudio. The file is available on our class repository on Github.   
+
+Once you have the file open on your local machine the first thing you will do is rename the file such that it includes your first and last name (e.g., "LuanaLima_TSA_A02_Sp26.Rmd"). Then change "Student Name" on line 4 with your name. 
+
+Then you will start working through the assignment by  **creating code and output** that answer each question. Be sure to use this assignment document. Your report should contain the answer to each question and any plots/tables you obtained (when applicable).
+
+When you have completed the assignment, **Knit** the text and code into a single PDF file. Submit this pdf using Sakai. 
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,tidy.opts=list(width.cutoff=60), tidy=TRUE) 
+#the tidy arguments prevent the code from running off the page i.e. wrap by itself
+```
+
+## R packages
+
+R packages needed for this assignment:"forecast","tseries", and "dplyr". Install these packages, if you haven't done yet. Do not forget to load them before running your script, since they are NOT default packages.\\
+
+```{r}
+#Load/install required package here
+library(lubridate)
+library(ggplot2)
+library(forecast)
+library(tseries)
+library(dplyr)
+library(readxl)
+library(openxlsx)
+```
+
+
+## Data set information  
+
+Consider the data provided in the spreadsheet "Table_10.1_Renewable_Energy_Production_and_Consumption_by_Source.xlsx" on our **Data** folder. The data comes from the US Energy Information and Administration and corresponds to the December 2025 Monthly Energy Review. The spreadsheet is ready to be used. Refer to the file "M2_ImportingData_XLSX.Rmd" in our Lessons folder for instructions on how to read $.xlsx$ files.
+
+```{r}
+#Importing data set
+energy_data1 <- read_excel(
+  path="./Data/Table_10.1_Renewable_Energy_Production_and_Consumption_by_Source.xlsx",skip = 12, sheet="Monthly Data",
+  col_names=FALSE) 
+
+read_col_names <- read_excel(
+  path="./Data/Table_10.1_Renewable_Energy_Production_and_Consumption_by_Source.xlsx",skip = 10,
+  n_max = 1, sheet="Monthly Data",
+  col_names=FALSE) 
+
+colnames(energy_data1) <- read_col_names
+
+head(energy_data1)
+```
+
+
+## Question 1
+You will work only with the following columns: Total Biomass Energy Production, Total Renewable Energy Production, Hydroelectric Power Consumption. Create a data frame structure with these three time series only. Use the command head() to verify your data.
+
+```{r}
+energy_ts <- energy_data1 %>%
+  select("Month",
+         "Total Biomass Energy Production",
+         "Total Renewable Energy Production",
+         "Hydroelectric Power Consumption")
+head(energy_ts)
+```
+
+
+## Question 2
+Transform your data frame in a time series object and specify the starting point and frequency of the time series using the function ts().
+
+```{r}
+energy_ts_object <- ts(
+  energy_ts[,2:4],start = c(1973, 1),
+  frequency = 12
+)
+```
+
+
+## Question 3
+Compute mean and standard deviation for these three series.
+
+```{r}
+ts_means <- apply(energy_ts_object, 2, mean, na.rm = TRUE)
+ts_sds <- apply(energy_ts_object, 2, sd, na.rm = TRUE)
+ts_means
+ts_sds
+```
+
+
+## Question 4
+Display and interpret the time series plot for each of these variables. Try to make your plot as informative as possible by writing titles, labels, etc. For each plot add a horizontal line at the mean of each series in a different color.
+
+```{r}
+autoplot(energy_ts_object) +
+  geom_hline(
+    yintercept = ts_means["Total Biomass Energy Production"],
+    color = "red",
+    linetype = "dashed"
+  ) +
+  geom_hline(
+    yintercept = ts_means["Total Renewable Energy Production"],
+    color = "green",
+    linetype = "dashed"
+  ) +
+  geom_hline(
+    yintercept = ts_means["Hydroelectric Power Consumption"],
+    color = "blue",
+    linetype = "dashed"
+  ) +
+  labs(color = "Source",
+       x = "Time",
+       y = "Renewable Energy Production and Consumption",
+       title = "Renewable Energy Production and Consumption Over Time")
+```
+
+
+## Question 5
+Compute the correlation between these three series. Are they significantly correlated? Explain your answer.
+
+```{r}
+ts_cor <- cor(energy_ts_object)
+ts_cor
+
+test1 <- cor.test(energy_ts_object[,1], energy_ts_object[,2])
+test2 <- cor.test(energy_ts_object[,1], energy_ts_object[,3])
+test3 <- cor.test(energy_ts_object[,2], energy_ts_object[,3])
+
+data.frame(
+  Pair = c("Biomass & Renewable", "Biomass & Hydro", "Renewable & Hydro"),
+  Correlation = c(test1$estimate, test2$estimate, test3$estimate),
+  p_value = c(test1$p.value, test2$p.value, test3$p.value)
+)
+
+```
+> Answer: To find out whether these three series are significantly correlated, we need to look at them in pairs. Between Biomass and Renewable, the correlation (r-value) is ~0.97 and the p-value is 0. This means that they are significantly correlated. This makes sense as biomass counts for part of the renewable energy production, and they both have upward trends. 
+Between Biomass and Hydro, the correlation is ~-0.13 and the p-value is 0. This means that they have a negative correlation and they are statistically correlated. This could also be seen from the plot that they have different trends.
+Between Renewable and Hydro, the correlation is ~-0.058 and the p-value is 0.14. This suggests that they have a negative correlation and they are not significantly correlated since p-value is > 0.05. 
+
+## Question 6
+Compute the autocorrelation function from lag 1 up to lag 40 for these three variables. What can you say about these plots? Do the three of them have the same behavior?
+
+```{r}
+par(mfrow = c(3, 1), mar = c(4, 4, 3, 1))
+biosmass_acf= acf(energy_ts_object[,1], lag.max = 40, plot=TRUE)
+renewable_acf=acf(energy_ts_object[,2], lag.max = 40, plot=TRUE)
+hydro_acf=acf(energy_ts_object[,3], lag.max = 40, plot=TRUE)
+par(mfrow = c(1, 1))
+```
+> Answer: The plots show that Biomass and Renewable have very, almost identical trends, where they both show high autocorrelation at low lags, and the autocorrelations gradually decay as lags increase. Hydro presents lower autocorrelation compared to the other two. It also shows varying autocorrelation as lags increase, suggesting a seasonal pattern and/or a series that is driven more by short-term effeccts.
+
+## Question 7
+Compute the partial autocorrelation function from lag 1 to lag 40 for these three variables. How these plots differ from the ones in Q6?
+
+```{r}
+par(mfrow = c(3, 1), mar = c(4, 4, 3, 1))
+biosmass_pacf= pacf(energy_ts_object[,1], lag.max = 40, plot=TRUE)
+renewable_pacf=pacf(energy_ts_object[,2], lag.max = 40, plot=TRUE)
+hydro_pacf=pacf(energy_ts_object[,3], lag.max = 40, plot=TRUE)
+par(mfrow = c(1, 1))
+```
+> Answer: These plots look very differently than the ones from Q6 (ACF). For all three time series, we see a high value at low lags first, then they drop significantly. The rest of the values mostly fall within the dashed lines. This suggests that strong correlation we saw previously in the ACF plot was driven by the relationship from previous months that we didn't account for in the PACF plots. 
+
