@@ -2,6 +2,8 @@
 title: "M3: Class Exercise on Trend and Season"
 author: "Luana Lima"
 output: pdf_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ## Setting R code chunk options
@@ -137,10 +139,22 @@ Let's identify and remove trend component. You start by fitting a linear model t
 
 ```{r}
 #Create vector t
+t <- c(1:nobs)
 
-
-
+#choose one HP
+iHP <- 15
 #Fit a linear trend to TS of iHP
+linear_trend_model <- lm(inflow_data[,iHP+1]~t)
+summary(linear_trend_model)
+
+#store reg coefficient
+beta0 <- as.numeric(linear_trend_model$coefficients[1]) #intercept
+beta1 <- as.numeric(linear_trend_model$coefficients[2])#slope
+
+#visualization
+ggplot(inflow_data,aes(x=my_date,y=inflow_data[,iHP+1]))+
+  geom_line(color="blue")+
+  geom_smooth(method = "lm",color="red")
 
 
 ```
@@ -148,7 +162,14 @@ Let's identify and remove trend component. You start by fitting a linear model t
 
 ```{r}
 #remove the trend from series
+detrend_inflow_data <- inflow_data[,iHP+1] - (beta0 + beta1*t)
+class(detrend_inflow_data)
 
+#transform to ts
+ts_detrend_inflow <- ts(detrend_inflow_data, frequency = 12, start = c(1931,1))
+
+autoplot(ts_inflow_data[,iHP]) +
+  autolayer(ts_detrend_inflow)
 
 
 ```
