@@ -3,7 +3,7 @@ title: "M6: Seasonal ARIMA Models in R"
 author: "Luana Lima"
 output: pdf_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
   markdown: 
     wrap: 72
 ---
